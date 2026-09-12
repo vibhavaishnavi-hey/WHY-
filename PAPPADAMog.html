@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix The Pappadam</title>
+    
+    <!-- Google Fonts for exact typography match -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Nunito:wght@600&display=swap" rel="stylesheet">
+    
+    <!-- MediaPipe Libraries for Computer Vision -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --pappadam-base: #F8E6A0;
+            --pappadam-dark: #d8c37a;
+            --pappadam-highlight: #fff7d6;
+            --text-color: #d8c48e; /* Matches the top left text color */
+            --bubble-text: #f0ead2;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100vw; height: 100vh;
+            overflow: hidden;
+            background-color: #2c1a0e;
+            font-family: 'Nunito', sans-serif;
+            user-select: none;
+            
+            /* If you place the background image in an assets folder, it will load perfectly */
+            background-image: url('assets/background.jpg'); 
+            background-size: cover;
+            background-position: center;
+        }
+
+        /* --- PROCEDURAL FALLBACK BACKGROUND (If no image is provided) --- */
+        .fallback-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.5)), repeating-linear-gradient(90deg, #3d2314, #3d2314 40px, #2c1a0e 40px, #2c1a0e 42px);
+            z-index: -2;
+        }
+        .fallback-leaf {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-3deg);
+            width: 95vw; height: 90vh;
+            background: #2a4b22;
+            border-radius: 50% 50% 40% 60% / 50% 40% 60% 50%;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.6), 0 20px 50px rgba(0,0,0,0.8);
+            background-image: repeating-linear-gradient(160deg, transparent, transparent 20px, rgba(255,255,255,0.03) 20px, rgba(255,255,255,0.03) 22px);
+            z-index: -1;
+        }
+
+        /* --- EXACT UI MATCHING --- */
+
+        /* 1. Top Left Instructions */
+        .instructions {
+            position: absolute;
+            top: 6%;
+            left: 4%;
+            color: var(--text-color);
+            font-family: 'Caveat', cursive;
+            font-size: 28px;
+            line-height: 1.1;
+            letter-spacing: 1px;
+            z-index: 10;
+            transform: rotate(-2deg);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        .instructions svg {
+            width: 35px; height: 35px;
+            vertical-align: middle;
+            margin-left: -5px;
+            margin-top: 5px;
+        }
+
+        /* 2. Bottom Left Webcam Status */
+        .webcam-status-btn {
+            position: absolute;
+            bottom: 6%;
+            left: 4%;
+            background: rgba(20, 25, 20, 0.85);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: #ccc;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+        }
+        .webcam-status-btn svg { width: 16px; height: 16px; fill: #ccc; }
+        .status-dot {
+            width: 8px; height: 8px;
+            background-color: #4caf50;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #4caf50;
+        }
+
+        /* 3. Top Right Webcam Panel */
+        .webcam-container {
+            position: absolute;
+            top: 5%;
+            right: 4%;
+            width: 200px;
+            height: 150px;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+        #webcam {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        .webcam-top-dot {
+            position: absolute;
+            top: 8px; right: 8px;
+            width: 6px; height: 6px;
+            background: #4caf50;
+            border-radius: 50%;
+        }
+        .webcam-label {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%;
+            background: rgba(0,0,0,0.7);
+            color: #ddd;
+            font-size: 11px;
+            padding: 5px 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-sizing: border-box;
+        }
+        .webcam-label svg { width: 14px; height: 14px; fill: #ddd; }
+
+        /* --- THE PAPPADAM --- */
+        #scene-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 420px; height: 420px;
+            z-index: 5;
+        }
+
+        .pappadam-whole {
+            position: absolute;
+            width: 100%; height: 100%;
+            background-color: var(--pappadam-base);
+            border-radius: 50%;
+            /* Complex procedural texture matching the image exactly */
+            background-image: 
+                radial-gradient(circle at 30% 30%, rgba(255,255,255,0.5) 1%, transparent 3%),
+                radial-gradient(circle at 70% 60%, rgba(255,255,255,0.4) 2%, transparent 4%),
+                radial-gradient(circle at 40% 80%, rgba(255,255,255,0.6) 1.5%, transparent 3%),
+                radial-gradient(circle at 80% 20%, rgba(0,0,0,0.08) 3%, transparent 6%),
+                radial-gradient(circle at 10% 50%, rgba(0,0,0,0.05) 4%, transparent 8%),
+                radial-gradient(circle at 50% 50%, rgba(200, 150, 50, 0.15) 40%, transparent 60%);
+            box-shadow: 
+                inset 0 0 30px rgba(180, 130, 40, 0.4),
+                0 15px 35px rgba(0,0,0,0.7);
+            filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
+            transition: transform 0.1s ease;
+        }
+
+        /* Irregular Edge Simulation */
+        .pappadam-edge {
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            border-radius: 50%;
+            border: 3px dashed rgba(210, 170, 90, 0.6);
+            mix-blend-mode: multiply;
+            pointer-events: none;
+        }
+
+        /* Highly realistic face details */
+        .face {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+        .eye {
+            position: absolute;
+            width: 22px; height: 22px;
+            background: #fff;
+            border-radius: 50%;
+            top: 35%;
+            box-shadow: 
+                inset 0 2px 5px rgba(0,0,0,0.6), 
+                0 3px 6px rgba(0,0,0,0.4),
+                0 -2px 10px rgba(255,255,255,0.4); /* Bulbous highlight */
+        }
+        .eye::after {
+            content: ''; position: absolute;
+            width: 9px; height: 9px;
+            background: #000;
+            border-radius: 50%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: inset -1px -1px 2px rgba(255,255,255,0.5); /* Catchlight */
+        }
+        .eye.left { left: 41%; }
+        .eye.right { right: 41%; }
+
+        .nose {
+            position: absolute;
+            width: 14px; height: 10px;
+            top: 45%; left: 50%;
+            transform: translateX(-50%);
+            background: radial-gradient(ellipse, rgba(0,0,0,0.1) 0%, transparent 70%);
+            border-bottom: 2px solid rgba(0,0,0,0.15);
+            border-radius: 50%;
+        }
+
+        .mouth {
+            position: absolute;
+            width: 24px; height: 8px;
+            background: #2a160b;
+            border-radius: 50%;
+            top: 55%; left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 
+                inset 0 4px 6px rgba(0,0,0,0.9),
+                0 2px 2px rgba(255,255,255,0.3);
+            transition: all 0.15s cubic-bezier(0.2, 1.5, 0.5, 1);
+        }
+
+        /* Mouth open shocked state */
+        .shocked .mouth {
+            width: 32px; height: 40px;
+            border-radius: 40px;
+        }
+
+        /* Broken Fragments Container */
+        #fragments {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: none;
+        }
+        .frag {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            transition: transform 0.6s cubic-bezier(0.15, 0.9, 0.3, 1), opacity 0.5s;
+            will-change: transform;
+        }
+        .frag-inner {
+            width: 100%; height: 100%;
+            background-color: var(--pappadam-base);
+            background-image: inherit; /* Copies the texture */
+        }
+
+        /* Small scattered crumbs */
+        .crumb {
+            position: absolute;
+            background: var(--pappadam-base);
+            border-radius: 40%;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.6);
+            opacity: 0;
+            transition: all 0.6s cubic-bezier(0.15, 0.9, 0.3, 1);
+            z-index: 4;
+        }
+
+        /* --- SPEECH BUBBLES (Hand-drawn SVG look) --- */
+        .speech-bubble {
+            position: absolute;
+            color: var(--bubble-text);
+            font-family: 'Caveat', cursive;
+            font-size: 32px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.1;
+            letter-spacing: 1px;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            z-index: 15;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            
+            /* Mimics the hand-drawn border in the image */
+            border: 2px solid #e2d7a9;
+            background: rgba(10, 15, 5, 0.6);
+            border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+            padding: 25px 40px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            backdrop-filter: blur(2px);
+        }
+        
+        .speech-bubble.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Speaker icon inside bubble */
+        .bubble-speaker {
+            margin-top: 10px;
+            width: 24px; height: 24px;
+            fill: none;
+            stroke: #e2d7a9;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Specific Bubble Placements matching the image */
+        #bubble-break {
+            top: 25%; right: 15%;
+            transform: scale(0.8) rotate(5deg);
+        }
+        #bubble-break.active { transform: scale(1) rotate(5deg); }
+        
+        #bubble-fix {
+            bottom: 25%; left: 18%;
+            transform: scale(0.8) rotate(-4deg);
+        }
+        #bubble-fix.active { transform: scale(1) rotate(-4deg); }
+
+
+        /* --- THE SLAPPING HAND --- */
+        .slap-hand {
+            position: absolute;
+            bottom: -50%; right: -20%;
+            width: 350px; height: auto;
+            z-index: 20;
+            transform: rotate(-30deg);
+            opacity: 0;
+            transition: all 0.15s ease-in;
+            filter: drop-shadow(-15px 25px 20px rgba(0,0,0,0.6)) blur(2px); /* Motion blur */
+        }
+        .slap-hand.slapping {
+            bottom: 10%; right: 25%;
+            transform: rotate(-10deg);
+            opacity: 1;
+            filter: drop-shadow(-5px 10px 10px rgba(0,0,0,0.8)) blur(0px);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Fallbacks if no image is present -->
+    <div class="fallback-bg"></div>
+    <div class="fallback-leaf"></div>
+
+    <!-- Top Left Text -->
+    <div class="instructions">
+        Open your mouth...<br>
+        Break it...<br>
+        Close your mouth...<br>
+        Fix it... 
+        <!-- Hand-drawn curved arrow SVG -->
+        <svg viewBox="0 0 100 100" fill="none" stroke="var(--text-color)" stroke-width="6" stroke-linecap="round">
+            <path d="M 70 30 C 90 50, 80 80, 50 80 C 20 80, 10 50, 30 30" />
+            <path d="M 15 35 L 30 30 L 35 45" />
+        </svg>
+    </div>
+
+    <!-- Bottom Left Status -->
+    <div class="webcam-status-btn">
+        <!-- Camera SVG -->
+        <svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10z"/></svg>
+        <span id="status-text">Use your webcam</span>
+        <div class="status-dot" id="status-dot"></div>
+    </div>
+
+    <!-- Top Right Webcam -->
+    <div class="webcam-container">
+        <div class="webcam-top-dot"></div>
+        <video id="webcam" autoplay playsinline muted></video>
+        <div class="webcam-label">
+            <svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10z"/></svg>
+            Your Face
+        </div>
+    </div>
+
+    <!-- Core Scene -->
+    <div id="scene-center">
+        <!-- The Intact Pappadam -->
+        <div class="pappadam-whole" id="pappadam-whole">
+            <div class="pappadam-edge"></div>
+            <div class="face">
+                <div class="eye left"></div>
+                <div class="eye right"></div>
+                <div class="nose"></div>
+                <div class="mouth"></div>
+            </div>
+        </div>
+
+        <!-- Fragments Container -->
+        <div id="fragments"></div>
+    </div>
+
+    <!-- Break Speech Bubble -->
+    <div class="speech-bubble" id="bubble-break">
+        AYYOOOOO<br>NOOOOOO
+        <svg class="bubble-speaker" viewBox="0 0 24 24">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+    </div>
+
+    <!-- Fix Speech Bubble -->
+    <div class="speech-bubble" id="bubble-fix">
+        NANNIYUNDEEEE......
+        <svg class="bubble-speaker" viewBox="0 0 24 24">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+    </div>
+
+    <!-- The Hand (Using an emoji scaled up immensely for accurate rendering without external assets) -->
+    <div class="slap-hand" id="slap-hand" style="font-size: 280px; line-height: 1;">🤚🏽</div>
+
+
+    <script>
+        // --- CONFIG ---
+        const OPEN_THRESHOLD = 0.45;
+        const CLOSE_THRESHOLD = 0.25;
+        
+        // Complex polygon paths to exactly match the shattered look in the image (lots of jagged pieces)
+        const shatterPolygons = [
+            "0% 0%, 30% 0%, 25% 15%, 15% 25%, 0% 20%",
+            "30% 0%, 60% 0%, 55% 10%, 40% 20%, 25% 15%",
+            "60% 0%, 100% 0%, 100% 20%, 75% 25%, 55% 10%",
+            "0% 20%, 15% 25%, 20% 45%, 0% 50%",
+            "15% 25%, 40% 20%, 45% 40%, 20% 45%",
+            "40% 20%, 75% 25%, 70% 45%, 45% 40%",
+            "75% 25%, 100% 20%, 100% 50%, 70% 45%",
+            "0% 50%, 20% 45%, 25% 65%, 0% 75%",
+            "20% 45%, 45% 40%, 50% 60%, 25% 65%", // Center left
+            "45% 40%, 70% 45%, 65% 65%, 50% 60%", // Center right
+            "70% 45%, 100% 50%, 100% 70%, 65% 65%",
+            "0% 75%, 25% 65%, 35% 85%, 0% 100%",
+            "25% 65%, 50% 60%, 45% 85%, 35% 85%",
+            "50% 60%, 65% 65%, 70% 85%, 45% 85%",
+            "65% 65%, 100% 70%, 100% 100%, 70% 85%",
+            "35% 85%, 45% 85%, 50% 100%, 30% 100%", // Bottom bits
+            "45% 85%, 70% 85%, 60% 100%, 50% 100%"
+        ];
+
+        // --- DOM Elements ---
+        const videoEl = document.getElementById('webcam');
+        const statusDot = document.getElementById('status-dot');
+        const pappadamWhole = document.getElementById('pappadam-whole');
+        const fragmentsContainer = document.getElementById('fragments');
+        const bubbleBreak = document.getElementById('bubble-break');
+        const bubbleFix = document.getElementById('bubble-fix');
+        const slapHand = document.getElementById('slap-hand');
+        
+        let isBroken = false;
+        let isAnimating = false;
+        let fragments = [];
+        let crumbs = [];
+
+        // --- INIT SCENE ---
+        function setupScene() {
+            // Replicate the texture definition from the whole pappadam
+            const texGradient = getComputedStyle(pappadamWhole).backgroundImage;
+
+            shatterPolygons.forEach((poly) => {
+                const frag = document.createElement('div');
+                frag.className = 'frag';
+                frag.style.clipPath = `polygon(${poly})`;
+                
+                const inner = document.createElement('div');
+                inner.className = 'frag-inner';
+                inner.style.backgroundImage = texGradient;
+                // Add the whole pappadam inner HTML so eyes/mouth get split
+                inner.innerHTML = pappadamWhole.innerHTML;
+
+                frag.appendChild(inner);
+                fragmentsContainer.appendChild(frag);
+
+                // Math to blast them outwards
+                const coords = poly.match(/\d+/g).map(Number);
+                const avgX = (coords[0] + coords[2] + coords[4]) / 3;
+                const avgY = (coords[1] + coords[3] + coords[5]) / 3;
+                
+                const distanceX = (avgX - 50) * 4 + (Math.random() * 80 - 40);
+                const distanceY = (avgY - 50) * 4 + (Math.random() * 80 - 40);
+                const rotate = (Math.random() - 0.5) * 120;
+
+                fragments.push({ el: frag, dx: distanceX, dy: distanceY, rot: rotate });
+            });
+
+            // Generate scattered crumbs mapping the reference
+            for(let i=0; i<15; i++) {
+                const crumb = document.createElement('div');
+                crumb.className = 'crumb';
+                const size = Math.random() * 12 + 4;
+                crumb.style.width = `${size}px`;
+                crumb.style.height = `${size}px`;
+                crumb.style.left = '50%';
+                crumb.style.top = '50%';
+                document.getElementById('scene-center').appendChild(crumb);
+                
+                crumbs.push({ 
+                    el: crumb, 
+                    dx: (Math.random() - 0.5) * 450, 
+                    dy: (Math.random() - 0.5) * 450 
+                });
+            }
+        }
+
+        // --- AUDIO ENGINE ---
+        let audioCtx;
+        function getCtx() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+
+        function playSnap() {
+            const ctx = getCtx();
+            for (let i = 0; i < 4; i++) { // Multiple layers for thick crunch
+                setTimeout(() => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    const filter = ctx.createBiquadFilter();
+
+                    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
+                    const data = buf.getChannelData(0);
+                    for (let j=0; j<data.length; j++) data[j] = Math.random() * 2 - 1;
+                    
+                    const src = ctx.createBufferSource();
+                    src.buffer = buf;
+                    filter.type = 'highpass';
+                    filter.frequency.value = 2500 + Math.random() * 2000;
+
+                    gain.gain.setValueAtTime(2.0, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+
+                    src.connect(filter).connect(gain).connect(ctx.destination);
+                    src.start();
+                }, i * 25);
+            }
+        }
+
+        // --- SPEECH API ---
+        function say(text, pitch) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.rate = 0.9;
+                utter.pitch = pitch;
+                window.speechSynthesis.speak(utter);
+            }
+        }
+
+        // --- INTERACTION LOGIC ---
+        function triggerBreak() {
+            if (isBroken || isAnimating) return;
+            isAnimating = true;
+            
+            pappadamWhole.classList.add('shocked');
+            
+            setTimeout(() => {
+                slapHand.classList.add('slapping');
+                
+                setTimeout(() => {
+                    isBroken = true;
+                    playSnap();
+                    
+                    pappadamWhole.style.display = 'none';
+                    fragmentsContainer.style.display = 'block';
+                    
+                    fragments.forEach(f => f.el.style.transform = `translate(${f.dx}px, ${f.dy}px) rotate(${f.rot}deg)`);
+                    crumbs.forEach(c => {
+                        c.el.style.transform = `translate(${c.dx}px, ${c.dy}px)`;
+                        c.el.style.opacity = '1';
+                    });
+
+                    slapHand.classList.remove('slapping');
+                    pappadamWhole.classList.remove('shocked');
+
+                    bubbleFix.classList.remove('active');
+                    bubbleBreak.classList.add('active');
+                    say("Ayyooooo! Noooooo!", 1.4);
+
+                    statusDot.style.backgroundColor = '#f44336'; // Red
+                    statusDot.style.boxShadow = '0 0 8px #f44336';
+                    
+                    setTimeout(() => { isAnimating = false; }, 800);
+                }, 120);
+            }, 150);
+        }
+
+        function triggerFix() {
+            if (!isBroken || isAnimating) return;
+            isAnimating = true;
+            
+            bubbleBreak.classList.remove('active');
+
+            fragments.forEach(f => f.el.style.transform = `translate(0, 0) rotate(0deg)`);
+            crumbs.forEach(c => {
+                c.el.style.transform = `translate(0, 0)`;
+                c.el.style.opacity = '0';
+            });
+
+            setTimeout(() => {
+                fragmentsContainer.style.display = 'none';
+                pappadamWhole.style.display = 'block';
+                isBroken = false;
+                
+                bubbleFix.classList.add('active');
+                say("Nanniyundeeeee", 1.0);
+
+                statusDot.style.backgroundColor = '#4caf50'; // Green
+                statusDot.style.boxShadow = '0 0 8px #4caf50';
+
+                setTimeout(() => { 
+                    isAnimating = false; 
+                    setTimeout(() => bubbleFix.classList.remove('active'), 3000);
+                }, 500);
+            }, 600);
+        }
+
+        // --- FACE TRACKING ---
+        let lastTime = 0;
+        function onFaceResult(res) {
+            if (!res.multiFaceLandmarks || res.multiFaceLandmarks.length === 0) return;
+            
+            const lm = res.multiFaceLandmarks[0];
+            const dy = Math.hypot(lm[13].x - lm[14].x, lm[13].y - lm[14].y);
+            const dx = Math.hypot(lm[61].x - lm[291].x, lm[61].y - lm[291].y);
+            const ratio = dy / dx;
+
+            const now = Date.now();
+            if (now - lastTime > 1000) {
+                if (!isBroken && ratio > OPEN_THRESHOLD) {
+                    triggerBreak();
+                    lastTime = now;
+                } else if (isBroken && ratio < CLOSE_THRESHOLD) {
+                    triggerFix();
+                    lastTime = now;
+                }
+            }
+        }
+
+        // Boot
+        window.addEventListener('DOMContentLoaded', () => {
+            setupScene();
+            document.body.addEventListener('click', getCtx, { once: true });
+
+            const fm = new FaceMesh({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+            fm.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            fm.onResults(onFaceResult);
+
+            const cam = new Camera(videoEl, { onFrame: async () => await fm.send({image: videoEl}), width: 320, height: 240 });
+            cam.start().catch(e => console.error("Webcam denied", e));
+        });
+
+    </script>
+</body>
+</html>
