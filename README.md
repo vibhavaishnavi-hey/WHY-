@@ -6,30 +6,29 @@
 
 
 ## Basic Details
-### Team Name: [Name]
+### Team Name: WHY?
 
 
 ### Team Members
-- Team Lead: [Name] - [College]
-- Member 2: [Name] - [College]
-- Member 3: [Name] - [College]
+- Team Lead: Malavika A Nair - Christ Collage of Engineering 
+- Member 2: Vibha Vaishnavi B -Christ Collage of Engineering 
 
 ### Project Description
-[2-3 lines about what your project does]
+Breaking pappadam when the user opens their mouth wide which detects the same using web camera  
 
 ### The Problem (that doesn't exist)
-[What ridiculous problem are you solving?]
+Every day, millions of pappadams suffer from the same terrible fate — they are broken into pieces and have absolutely no way to put themselves back together. Humans simply accept this tragedy.
 
 ### The Solution (that nobody asked for)
-[How are you solving it? Keep it fun!]
+Give the pappadam a second chance. 😭
 
 ## Technical Details
 ### Technologies/Components Used
 For Software:
-- [Languages used]
-- [Frameworks used]
-- [Libraries used]
-- [Tools used]
+- HTML5, CSS3, JavaScript
+- Vanilla JavaScript (no major framework)
+- MediaPipe Face Mesh, MediaPipe Camera Utils
+- VS Code, Web Browser, Web Audio API, Web Speech API, Git/GitHub
 
 For Hardware:
 - [List main components]
@@ -37,25 +36,32 @@ For Hardware:
 - [List tools required]
 
 ### Implementation
-For Software:
+For Software:  Built with HTML, CSS & JavaScript
+MediaPipe Face Mesh for mouth tracking
+Webcam API for real-time input
+CSS/JS animations for pappadam breaking & reassembly
+Web Audio API for crack sounds
+Web Speech API for voice reactions
+
 # Installation
 [commands]
 
 # Run
-[commands]
+python -m http.server 8000
+http://localhost:8000
 
 ### Project Documentation
-For Software:
+For Software:  Fix The Pappadam is a fun, useless web application that uses real-time mouth tracking to control a virtual pappadam.
+
+Input: User’s webcam and mouth movements
+Processing: MediaPipe Face Mesh detects mouth opening/closing
+Action: Open mouth → pappadam breaks; close mouth → pappadam repairs
+Output: Animated pappadam with crack sounds and funny voice reactions
+Technology: HTML, CSS, JavaScript, MediaPipe, Web Audio API & Web Speech API
+Platform: Browser-based, no backend required
 
 # Screenshots (Add at least 3)
-![Screenshot1](Add screenshot 1 here with proper name)
-*Add caption explaining what this shows*
-
-![Screenshot2](Add screenshot 2 here with proper name)
-*Add caption explaining what this shows*
-
-![Screenshot3](Add screenshot 3 here with proper name)
-*Add caption explaining what this shows*
+https://drive.google.com/drive/folders/17dU6-fOMHPi9j94rKQL8emGyji4yfq5V?q=sharedwith:public%20parent:17dU6-fOMHPi9j94rKQL8emGyji4yfq5V
 
 # Diagrams
 ![Workflow](Add your workflow/architecture diagram here)
